@@ -73,10 +73,10 @@ public class ProcessService {
             File jsonOutputFile = new File(JSON_DIR, folderName + "-" + formattedDate + ".json");
 
             try (FileWriter writer = new FileWriter(jsonOutputFile)) {
-                if (result.totalFilteredRows > 0) {
-                    writer.write(objectMapper.writeValueAsString(new JsonOutput(result)));
+                if (!result.data.isEmpty()) {
+                    writer.write(objectMapper.writeValueAsString(result.data));
                 } else {
-                    writer.write("{}");
+                    writer.write("");
                 }
                 System.out.println("JSON saved: " + jsonOutputFile.getAbsolutePath());
             } catch (IOException e) {
@@ -90,7 +90,8 @@ public class ProcessService {
         try (FileWriter writer = new FileWriter(manifestFile)) {
             for (Map.Entry<String, FilterResult> entry : filteredResults.entrySet()) {
                 FilterResult result = entry.getValue();
-                writer.write(result.folderName + "|" + result.editedDate + "|" + result.totalFilteredRows + "\n");
+                String formattedDate = LocalDate.parse(result.editedDate).format(DATE_FORMATTER);
+                writer.write(result.folderName + "|" + formattedDate + "|" + result.totalFilteredRows + "\n");
             }
             System.out.println("Manifest file saved: " + manifestFile.getAbsolutePath());
         } catch (IOException e) {
@@ -151,28 +152,6 @@ public class ProcessService {
         public FileDetail(String file, int recordCount) {
             this.file = file;
             this.recordCount = recordCount;
-        }
-    }
-
-    public static class JsonOutput {
-        public List<Map<String, Object>> data;
-        public Controls controls;
-
-        public JsonOutput(FilterResult result) {
-            this.data = result.data;
-            this.controls = new Controls(result);
-        }
-    }
-
-    public static class Controls {
-        public int total_filtered_rows;
-        public String edited_date;
-        public List<FileDetail> files;
-
-        public Controls(FilterResult result) {
-            this.total_filtered_rows = result.totalFilteredRows;
-            this.edited_date = result.editedDate;
-            this.files = result.files;
         }
     }
 }
