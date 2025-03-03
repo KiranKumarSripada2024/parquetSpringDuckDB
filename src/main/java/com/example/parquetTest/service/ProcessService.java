@@ -7,10 +7,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 public class ProcessService {
@@ -26,7 +29,9 @@ public class ProcessService {
 
     private static final String JSON_DIR = "Json_filtered";
     private static final String MANIFEST_FILE = "manifest.txt";
+    private static final String ZIP_FILE_NAME = JSON_DIR + ".zip";
     private final ObjectMapper objectMapper;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public ProcessService() {
         this.objectMapper = new ObjectMapper();
@@ -55,20 +60,20 @@ public class ProcessService {
         // Step 5: Save JSON output and generate manifest.txt
         saveJsonOutput(filteredResults);
         generateManifest(filteredResults);
+
+        // Step 6: Zip the Json_filtered directory
+        zipJsonFilteredDirectory();
     }
 
-    /**
-     * Saves the JSON output for each folder.
-     */
     private void saveJsonOutput(Map<String, FilterResult> filteredResults) {
         for (Map.Entry<String, FilterResult> entry : filteredResults.entrySet()) {
             String folderName = entry.getKey();
             FilterResult result = entry.getValue();
-            File jsonOutputFile = new File(JSON_DIR, folderName + "-" + result.editedDate + ".json");
+            String formattedDate = LocalDate.parse(result.editedDate).format(DATE_FORMATTER);
+            File jsonOutputFile = new File(JSON_DIR, folderName + "-" + formattedDate + ".json");
 
             try (FileWriter writer = new FileWriter(jsonOutputFile)) {
                 if (result.totalFilteredRows > 0) {
-                    // ✅ Structured JSON output using ObjectMapper
                     writer.write(objectMapper.writeValueAsString(new JsonOutput(result)));
                 } else {
                     writer.write("{}");
@@ -80,9 +85,6 @@ public class ProcessService {
         }
     }
 
-    /**
-     * Generates the manifest.txt file.
-     */
     private void generateManifest(Map<String, FilterResult> filteredResults) {
         File manifestFile = new File(JSON_DIR, MANIFEST_FILE);
         try (FileWriter writer = new FileWriter(manifestFile)) {
@@ -96,9 +98,29 @@ public class ProcessService {
         }
     }
 
-    /**
-     * Helper class to store filter results.
-     */
+    private void zipJsonFilteredDirectory() {
+        try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(ZIP_FILE_NAME))) {
+            Path sourceDirPath = Paths.get(JSON_DIR);
+            Files.walk(sourceDirPath).forEach(path -> {
+                try {
+                    String fileName = sourceDirPath.relativize(path).toString();
+                    if (!fileName.isEmpty()) {
+                        zipOut.putNextEntry(new ZipEntry(fileName));
+                        if (!Files.isDirectory(path)) {
+                            Files.copy(path, zipOut);
+                        }
+                        zipOut.closeEntry();
+                    }
+                } catch (IOException e) {
+                    System.err.println("Error zipping file: " + path + " - " + e.getMessage());
+                }
+            });
+            System.out.println("Zipped JSON directory: " + ZIP_FILE_NAME);
+        } catch (IOException e) {
+            System.err.println("Error creating ZIP file: " + e.getMessage());
+        }
+    }
+
     public static class FilterResult {
         public String folderName;
         public String editedDate;
@@ -122,9 +144,6 @@ public class ProcessService {
         }
     }
 
-    /**
-     * Helper class to store file details.
-     */
     public static class FileDetail {
         public String file;
         public int recordCount;
@@ -135,9 +154,6 @@ public class ProcessService {
         }
     }
 
-    /**
-     * JSON Output format class (Ensures strict formatting)
-     */
     public static class JsonOutput {
         public List<Map<String, Object>> data;
         public Controls controls;
@@ -148,9 +164,6 @@ public class ProcessService {
         }
     }
 
-    /**
-     * Controls JSON structure
-     */
     public static class Controls {
         public int total_filtered_rows;
         public String edited_date;
