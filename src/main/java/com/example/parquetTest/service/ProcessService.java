@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,7 @@ import java.util.zip.ZipOutputStream;
 
 @Service
 public class ProcessService {
+    private static final Logger logger = LoggerFactory.getLogger(ProcessService.class);
 
     @Autowired
     private DownloadService downloadService;
@@ -38,7 +41,7 @@ public class ProcessService {
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.setSerializationInclusion(JsonInclude.Include.ALWAYS);
     }
 
     public void process() throws Exception {
@@ -54,7 +57,7 @@ public class ProcessService {
         // Step 4: Ensure Json_filtered directory exists
         File jsonDir = new File(JSON_DIR);
         if (!jsonDir.exists() && jsonDir.mkdirs()) {
-            System.out.println("Json_filtered directory created: " + jsonDir.getAbsolutePath());
+            logger.info("Json_filtered directory created: {}", jsonDir.getAbsolutePath());
         }
 
         // Step 5: Save JSON output and generate manifest.txt
@@ -74,28 +77,44 @@ public class ProcessService {
 
             try (FileWriter writer = new FileWriter(jsonOutputFile)) {
                 if (!result.data.isEmpty()) {
-                    writer.write(objectMapper.writeValueAsString(result.data));
+                    List<Map<String, Object>> removeData = new ArrayList<>();
+                    for (Map<String, Object> row : result.data) {
+                        Map<String, Object> removedRow = new HashMap<>(row);
+                        removedRow.remove("filter_date");
+                        removeData.add(removedRow);
+                    }
+                    writer.write(objectMapper.writeValueAsString(removeData));
                 } else {
                     writer.write("");
                 }
-                System.out.println("JSON saved: " + jsonOutputFile.getAbsolutePath());
+                logger.info("JSON saved: {}", jsonOutputFile.getAbsolutePath());
             } catch (IOException e) {
-                System.err.println("Error writing JSON file: " + jsonOutputFile.getName() + " - " + e.getMessage());
+                logger.error("Error writing JSON file: {} - {}", jsonOutputFile.getName(), e.getMessage());
             }
         }
     }
 
     private void generateManifest(Map<String, FilterResult> filteredResults) {
-        File manifestFile = new File(JSON_DIR, MANIFEST_FILE);
-        try (FileWriter writer = new FileWriter(manifestFile)) {
-            for (Map.Entry<String, FilterResult> entry : filteredResults.entrySet()) {
-                FilterResult result = entry.getValue();
-                String formattedDate = LocalDate.parse(result.editedDate).format(DATE_FORMATTER);
-                writer.write(result.folderName + "|" + formattedDate + "|" + result.totalFilteredRows + "\n");
+        Optional<String> optionalEditedDate = filteredResults.values().stream()
+                .map(result -> result.editedDate)
+                .filter(Objects::nonNull)
+                .findFirst();
+        if (optionalEditedDate.isPresent()) {
+            String formattedDate = LocalDate.parse(optionalEditedDate.get()).format(DATE_FORMATTER);
+            String manifestFileName = "manifest-" + formattedDate + ".txt";
+            File manifestFile = new File(JSON_DIR, manifestFileName);
+
+            try (FileWriter writer = new FileWriter(manifestFile)) {
+                for (Map.Entry<String, FilterResult> entry : filteredResults.entrySet()) {
+                    FilterResult result = entry.getValue();
+                    writer.write(result.folderName + "|" + formattedDate + "|" + result.totalFilteredRows + "\n");
+                }
+                logger.info("Manifest file saved: {}", manifestFile.getAbsolutePath());
+            } catch (IOException e) {
+                logger.error("Error writing {}: {}", manifestFileName, e.getMessage());
             }
-            System.out.println("Manifest file saved: " + manifestFile.getAbsolutePath());
-        } catch (IOException e) {
-            System.err.println("Error writing manifest.txt: " + e.getMessage());
+        } else {
+            logger.error("Error: No valid edited_date found for manifest naming.");
         }
     }
 
@@ -113,12 +132,12 @@ public class ProcessService {
                         zipOut.closeEntry();
                     }
                 } catch (IOException e) {
-                    System.err.println("Error zipping file: " + path + " - " + e.getMessage());
+                    logger.error("Error zipping file: {} - {}", path, e.getMessage());
                 }
             });
-            System.out.println("Zipped JSON directory: " + ZIP_FILE_NAME);
+            logger.info("Zipped JSON directory: " + ZIP_FILE_NAME);
         } catch (IOException e) {
-            System.err.println("Error creating ZIP file: " + e.getMessage());
+            logger.error("Error creating ZIP file: {}", e.getMessage());
         }
     }
 
