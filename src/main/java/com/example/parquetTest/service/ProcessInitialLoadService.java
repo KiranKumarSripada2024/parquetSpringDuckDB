@@ -31,7 +31,6 @@ public class ProcessInitialLoadService {
     private InitialLoadService initialLoadService;
 
     private static final String JSON_DIR = "Json_InitialLoad";
-    private static final String MANIFEST_FILE = "manifest.txt";
     private static final String ZIP_FILE_NAME = JSON_DIR + ".zip";
     private final ObjectMapper objectMapper;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -51,47 +50,20 @@ public class ProcessInitialLoadService {
         // Step 2: Extract Parquet files into memory (byte arrays)
         Map<String, List<byte[]>> parquetFiles = extractionService.extractParquetFromZip(zipFile);
 
-        // Step 3: Filter data using DuckDB (directly from memory)
+        // Step 3: Filter data using DuckDB (writing directly to files)
         Map<String, FilterResult> filteredResults = initialLoadService.filterParquetFiles(parquetFiles);
 
         // Step 4: Ensure Json_filtered directory exists
         File jsonDir = new File(JSON_DIR);
         if (!jsonDir.exists() && jsonDir.mkdirs()) {
-            logger.info("Json_filtered directory created: {}", jsonDir.getAbsolutePath());
+            logger.info("Json_InitialLoad directory created: {}", jsonDir.getAbsolutePath());
         }
 
-        // Step 5: Save JSON output and generate manifest.txt
-        saveJsonOutput(filteredResults);
+        // Step 5: Generate manifest.txt
         generateManifest(filteredResults);
 
         // Step 6: Zip the Json_filtered directory
         zipJsonFilteredDirectory();
-    }
-
-    private void saveJsonOutput(Map<String, FilterResult> filteredResults) {
-        for (Map.Entry<String, FilterResult> entry : filteredResults.entrySet()) {
-            String folderName = entry.getKey();
-            FilterResult result = entry.getValue();
-            String formattedDate = LocalDate.parse(result.editedDate).format(DATE_FORMATTER);
-            File jsonOutputFile = new File(JSON_DIR, folderName + "-" + formattedDate + ".json");
-
-            try (FileWriter writer = new FileWriter(jsonOutputFile)) {
-                if (!result.data.isEmpty()) {
-                    List<Map<String, Object>> removeData = new ArrayList<>();
-//                    for (Map<String, Object> row : result.data) {
-//                        Map<String, Object> removedRow = new HashMap<>(row);
-//                        removedRow.remove("filter_date");
-//                        removeData.add(removedRow);
-//                    }
-                    writer.write(objectMapper.writeValueAsString(removeData));
-                } else {
-                    writer.write("");
-                }
-                logger.info("JSON saved: {}", jsonOutputFile.getAbsolutePath());
-            } catch (IOException e) {
-                logger.error("Error writing JSON file: {} - {}", jsonOutputFile.getName(), e.getMessage());
-            }
-        }
     }
 
     private void generateManifest(Map<String, FilterResult> filteredResults) {
@@ -99,6 +71,7 @@ public class ProcessInitialLoadService {
                 .map(result -> result.editedDate)
                 .filter(Objects::nonNull)
                 .findFirst();
+
         if (optionalEditedDate.isPresent()) {
             String formattedDate = LocalDate.parse(optionalEditedDate.get()).format(DATE_FORMATTER);
             String manifestFileName = "manifest-" + formattedDate + ".txt";
@@ -145,7 +118,6 @@ public class ProcessInitialLoadService {
         public String folderName;
         public String editedDate;
         public int totalFilteredRows;
-        public List<Map<String, Object>> data = new ArrayList<>();
         public List<FileDetail> files = new ArrayList<>();
 
         public FilterResult(String folderName, String editedDate) {
@@ -155,7 +127,7 @@ public class ProcessInitialLoadService {
         }
 
         public void addData(Map<String, Object> row) {
-            this.data.add(row);
+            // Not storing data in memory anymore
         }
 
         public void addFile(String fileName, int recordCount) {
