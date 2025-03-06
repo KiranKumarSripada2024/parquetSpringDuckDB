@@ -3,6 +3,14 @@
 ## VM OPTIONS
 -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
 
+## API CALLING
+
+### For Initial Load:-
+http://localhost:8080/api/parquet/initialLoad
+
+### For Processing Delta Changes:-
+http://localhost:8080/api/parquet/process
+
 ## Overview  
 This Spring Boot project processes Parquet files from a ZIP archive, filters them using DuckDB, and generates structured JSON output along with a `manifest.txt` file.
 
