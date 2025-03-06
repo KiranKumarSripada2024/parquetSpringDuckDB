@@ -12,8 +12,11 @@ public class AppConfig {
     @Value("${app.download.dir}")
     private String downloadDir;
 
-    @Value("${app.json.dir}")
-    private String jsonDir;
+    @Value("${app.json.dir1}")
+    private String jsonDir1;
+
+    @Value("${app.json.dir2}")
+    private String jsonDir2;
 
     @Value("${app.duckdb.file}")
     private String duckDbFile;
@@ -21,8 +24,9 @@ public class AppConfig {
     @Value("${app.username}")
     private String username;
 
-    @Value("${app.password}")
-    private String password;
+    public String getPassword() {
+        return password;
+    }
 
     public String getDownloadUrl() {
         return downloadUrl;
@@ -32,8 +36,12 @@ public class AppConfig {
         return downloadDir;
     }
 
-    public String getJsonDir() {
-        return jsonDir;
+    public String getJsonDir1() {
+        return jsonDir1;
+    }
+
+    public String getJsonDir2() {
+        return jsonDir2;
     }
 
     public String getDuckDbFile() {
@@ -44,8 +52,11 @@ public class AppConfig {
         return username;
     }
 
-    public String getPassword() {
-        return password;
-    }
+    @Value("${app.password}")
+    private String password;
+
+
+
+
 }
 
