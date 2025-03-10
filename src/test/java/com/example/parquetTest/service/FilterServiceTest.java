@@ -42,7 +42,6 @@ public class FilterServiceTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // Setup test parquet files
         testParquetFiles = new HashMap<>();
         testParquetFiles.put("asset", Arrays.asList(createMockParquetBytes("asset")));
         testParquetFiles.put("view_events", Arrays.asList(createMockParquetBytes("view_events")));
@@ -51,13 +50,11 @@ public class FilterServiceTest {
     @Test
     void testFilterParquetFiles() throws Exception {
         try (MockedStatic<DuckDBUtil> mockDuckDBUtil = mockStatic(DuckDBUtil.class)) {
-            // Arrange
             mockDuckDBUtil.when(DuckDBUtil::getConnection).thenReturn(mockConnection);
             when(mockConnection.createStatement()).thenReturn(mockStatement);
             when(mockStatement.executeQuery(anyString())).thenReturn(mockResultSet);
 
-            // Mock ResultSet behavior
-            when(mockResultSet.next()).thenReturn(true, false, true, false); // First for data, second for count
+            when(mockResultSet.next()).thenReturn(true, false, true, false);
             when(mockResultSet.getMetaData()).thenReturn(mockMetaData);
             when(mockMetaData.getColumnCount()).thenReturn(3);
             when(mockMetaData.getColumnName(1)).thenReturn("id");
@@ -68,57 +65,47 @@ public class FilterServiceTest {
             when(mockResultSet.getObject(3)).thenReturn(100);
             when(mockResultSet.getInt("cnt")).thenReturn(10);
 
-            // Act
             Map<String, ProcessService.FilterResult> result = filterService.filterParquetFiles(testParquetFiles);
 
-            // Assert
             assertNotNull(result);
             assertEquals(2, result.size());
             assertTrue(result.containsKey("asset"));
             assertTrue(result.containsKey("view_events"));
 
-            // Verify asset filter result
             ProcessService.FilterResult assetResult = result.get("asset");
             assertEquals("asset", assetResult.folderName);
             assertEquals(LocalDate.now().minusDays(1).toString(), assetResult.editedDate);
-            assertEquals(20, assetResult.totalFilteredRows); // 10 records per file, 2 files
+            assertEquals(20, assetResult.totalFilteredRows);
             assertEquals(1, assetResult.data.size());
 
-            // Verify data fields
             Map<String, Object> assetData = assetResult.data.get(0);
             assertEquals("1", assetData.get("id"));
             assertEquals("Test Name", assetData.get("name"));
             assertEquals(100, assetData.get("value"));
 
-            // Verify SQL execution counts
-            verify(mockStatement, times(8)).execute(anyString()); // CREATE, ALTER, UPDATE, DROP x 2 files
-            verify(mockStatement, times(4)).executeQuery(anyString()); // SELECT data, SELECT count x 2 files
+            verify(mockStatement, times(8)).execute(anyString());
+            verify(mockStatement, times(4)).executeQuery(anyString());
         }
     }
 
     @Test
     void testFilterParquetFilesWithException() throws Exception {
         try (MockedStatic<DuckDBUtil> mockDuckDBUtil = mockStatic(DuckDBUtil.class)) {
-            // Arrange - Simulate an exception
             mockDuckDBUtil.when(DuckDBUtil::getConnection).thenThrow(new SQLException("Test exception"));
 
-            // Act
             Map<String, ProcessService.FilterResult> result = filterService.filterParquetFiles(testParquetFiles);
 
-            // Assert
             assertNotNull(result);
             assertEquals(0, result.size());
         }
     }
 
-    // Helper method to create mock parquet bytes
     private byte[] createMockParquetBytes(String folderName) throws IOException {
-        // Create a temporary file to simulate a parquet file
         File tempFile = File.createTempFile("mock_" + folderName, ".parquet");
         try (FileOutputStream fos = new FileOutputStream(tempFile)) {
             fos.write(("Mock " + folderName + " Parquet Data").getBytes());
         }
         tempFile.deleteOnExit();
-        return tempFile.getPath().getBytes(); // Just return the path as bytes for testing
+        return tempFile.getPath().getBytes();
     }
 }

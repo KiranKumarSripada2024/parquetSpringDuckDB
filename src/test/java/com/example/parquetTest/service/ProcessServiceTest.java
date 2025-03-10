@@ -18,7 +18,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,19 +42,15 @@ public class ProcessServiceTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // Create a mock zip file
         mockZipFile = File.createTempFile("test_zip", ".zip");
         mockZipFile.deleteOnExit();
 
-        // Setup yesterday's date
         yesterdayDate = LocalDate.now().minusDays(1).toString();
 
-        // Setup mock parquet files map
         mockParquetFiles = new HashMap<>();
         mockParquetFiles.put("asset", Collections.singletonList(createMockParquetBytes("asset")));
         mockParquetFiles.put("view_events", Collections.singletonList(createMockParquetBytes("view_events")));
 
-        // Setup mock filter results
         mockFilteredResults = new HashMap<>();
         mockFilteredResults.put("asset", createMockFilterResult("asset", 10));
         mockFilteredResults.put("view_events", createMockFilterResult("view_events", 20));
@@ -63,33 +58,26 @@ public class ProcessServiceTest {
 
     @Test
     void testProcess() throws Exception {
-        // Arrange
         when(downloadService.downloadZip()).thenReturn(mockZipFile);
         when(extractionService.extractParquetFromZip(mockZipFile)).thenReturn(mockParquetFiles);
         when(filterService.filterParquetFiles(mockParquetFiles)).thenReturn(mockFilteredResults);
 
-        // Act
         processService.process();
 
-        // Assert
         verify(downloadService, times(1)).downloadZip();
         verify(extractionService, times(1)).extractParquetFromZip(mockZipFile);
         verify(filterService, times(1)).filterParquetFiles(mockParquetFiles);
 
-        // Verify JSON directory creation and files
         File jsonDir = new File("Json_filtered");
         assertTrue(jsonDir.exists(), "JSON directory should be created");
 
-        // Verify manifest file
         String formattedDate = LocalDate.parse(yesterdayDate).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         File manifestFile = new File(jsonDir, "manifest-" + formattedDate + ".txt");
         assertTrue(manifestFile.exists(), "Manifest file should be created");
 
-        // Verify zip file
         File zipFile = new File("Json_filtered.zip");
         assertTrue(zipFile.exists(), "Zip file should be created");
 
-        // Clean up
         manifestFile.delete();
         jsonDir.delete();
         zipFile.delete();
@@ -97,10 +85,8 @@ public class ProcessServiceTest {
 
     @Test
     void testSaveJsonOutput() throws Exception {
-        // Arrange
         ReflectionTestUtils.invokeMethod(processService, "saveJsonOutput", mockFilteredResults);
 
-        // Assert
         File jsonDir = new File("Json_filtered");
         assertTrue(jsonDir.exists(), "JSON directory should be created");
 
@@ -111,7 +97,6 @@ public class ProcessServiceTest {
         assertTrue(assetJsonFile.exists(), "Asset JSON file should be created");
         assertTrue(viewEventsJsonFile.exists(), "View events JSON file should be created");
 
-        // Clean up
         assetJsonFile.delete();
         viewEventsJsonFile.delete();
         jsonDir.delete();
@@ -119,10 +104,8 @@ public class ProcessServiceTest {
 
     @Test
     void testGenerateManifest() throws Exception {
-        // Arrange
         ReflectionTestUtils.invokeMethod(processService, "generateManifest", mockFilteredResults);
 
-        // Assert
         File jsonDir = new File("Json_filtered");
         assertTrue(jsonDir.exists(), "JSON directory should be created");
 
@@ -130,12 +113,10 @@ public class ProcessServiceTest {
         File manifestFile = new File(jsonDir, "manifest-" + formattedDate + ".txt");
         assertTrue(manifestFile.exists(), "Manifest file should be created");
 
-        // Clean up
         manifestFile.delete();
         jsonDir.delete();
     }
 
-    // Helper methods
     private byte[] createMockParquetBytes(String folderName) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zos = new ZipOutputStream(baos);
@@ -150,7 +131,6 @@ public class ProcessServiceTest {
     private ProcessService.FilterResult createMockFilterResult(String folderName, int recordCount) {
         ProcessService.FilterResult result = new ProcessService.FilterResult(folderName, yesterdayDate);
 
-        // Add sample data
         Map<String, Object> row1 = new HashMap<>();
         row1.put("id", "1");
         row1.put("name", "Test Name");
