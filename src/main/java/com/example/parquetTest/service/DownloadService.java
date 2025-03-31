@@ -26,7 +26,7 @@ public class DownloadService {
     private AppConfig appConfig;
 
     public File downloadZip() throws IOException {
-        String date1 = LocalDate.now().minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        String date1 = LocalDate.now().minusDays(4).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         String zipUrl = appConfig.getDownloadUrl() + date1 + "&format=zip";
         File zipFile = new File(appConfig.getDownloadDir(), "insights_" + date1 + ".zip");
 

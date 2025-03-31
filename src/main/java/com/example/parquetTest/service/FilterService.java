@@ -18,7 +18,7 @@ public class FilterService {
 
     public Map<String, ProcessService.FilterResult> filterParquetFiles(Map<String, List<byte[]>> files) {
         Map<String, ProcessService.FilterResult> folderResults = new HashMap<>();
-        String editedDate = LocalDate.now().minusDays(1).toString(); // SYSDATE-1
+        String editedDate = LocalDate.now().minusDays(4).toString(); // SYSDATE-1
 
         try (Connection conn = DuckDBUtil.getConnection();
              Statement stmt = conn.createStatement()) {
